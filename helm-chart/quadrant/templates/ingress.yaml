@@ -1,0 +1,84 @@
+# -----------------------------------------------------------
+# INGRESS RESOURCE API VERSION
+# Specifies the Kubernetes networking API group used for
+# defining external HTTP routing rules.
+# -----------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+
+
+# -----------------------------------------------------------
+# RESOURCE TYPE
+# Declares this object as an Ingress resource which enables
+# external access to services inside the Kubernetes cluster.
+# -----------------------------------------------------------
+kind: Ingress
+
+
+# -----------------------------------------------------------
+# METADATA
+# Metadata provides identification information for this
+# Ingress resource inside the Kubernetes namespace.
+# -----------------------------------------------------------
+metadata:
+  name: nodapp-ingress # Unique name assigned to this ingress
+
+
+# -----------------------------------------------------------
+# INGRESS SPECIFICATION
+# Defines how incoming HTTP traffic is routed to backend
+# services inside the Kubernetes cluster.
+# -----------------------------------------------------------
+spec:
+
+  # ---------------------------------------------------------
+  # INGRESS CONTROLLER CLASS
+  # Determines which ingress controller will process
+  # this resource (for example: nginx, traefik, alb).
+  # ---------------------------------------------------------
+  ingressClassName: {{ .Values.ingress.className }}
+
+
+  # ---------------------------------------------------------
+  # HOST BASED ROUTING RULES
+  # Defines domain names and their corresponding routing
+  # behavior inside the cluster.
+  # ---------------------------------------------------------
+  rules:
+
+    # -------------------------------------------------------
+    # DOMAIN HOST CONFIGURATION
+    # Incoming traffic to this host will follow the rules
+    # defined below.
+    # -------------------------------------------------------
+    - host: {{ (index .Values.ingress.hosts 0).host }}
+
+      http:
+
+        # ---------------------------------------------------
+        # URL PATH ROUTING RULES
+        # Defines which service should handle requests for
+        # specific URL paths.
+        # ---------------------------------------------------
+        paths:
+
+          - path: {{ (index (index .Values.ingress.hosts 0).paths 0).path }}
+
+            # ------------------------------------------------
+            # PATH MATCHING STRATEGY
+            # Prefix means any URL starting with this path
+            # will be routed to the backend service.
+            # ------------------------------------------------
+            pathType: {{ (index (index .Values.ingress.hosts 0).paths 0).pathType }}
+
+            backend:
+
+              # ----------------------------------------------
+              # TARGET SERVICE CONFIGURATION
+              # Specifies which Kubernetes service receives
+              # traffic from this ingress rule.
+              # ----------------------------------------------
+              service:
+                name: nodapp-service
+
+                port:
+                  number: {{ .Values.service.port }}

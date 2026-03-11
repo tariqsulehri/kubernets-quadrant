@@ -1,0 +1,91 @@
+# -----------------------------------------------------------
+# API VERSION
+# Defines the Helm chart specification version.
+# v2 is used by Helm 3 and above.
+# -----------------------------------------------------------
+apiVersion: v2
+
+
+# -----------------------------------------------------------
+# CHART NAME
+# Name of the Helm chart (must be unique within repository).
+# Usually same as application name.
+# -----------------------------------------------------------
+name: nodapp
+
+
+# -----------------------------------------------------------
+# DESCRIPTION
+# Short explanation of what this chart deploys.
+# Helps users understand the purpose of the chart.
+# -----------------------------------------------------------
+description: A Helm chart for deploying the Node.js Kubernetes application
+
+
+# -----------------------------------------------------------
+# CHART TYPE
+# Two possible values:
+#
+# application → deploys an application (most common)
+# library     → reusable chart components
+# -----------------------------------------------------------
+type: application
+
+
+# -----------------------------------------------------------
+# CHART VERSION
+# Version of the chart itself.
+#
+# This changes when chart templates change.
+# Example:
+# - new Kubernetes manifest
+# - new configuration option
+# -----------------------------------------------------------
+version: 1.0.0
+
+
+# -----------------------------------------------------------
+# APPLICATION VERSION
+# Version of the application being deployed.
+#
+# This changes when application code changes.
+# Example:
+# - new Docker image
+# -----------------------------------------------------------
+appVersion: "1.0.0"
+
+
+# -----------------------------------------------------------
+# MAINTAINERS
+# Optional but recommended.
+# Defines who maintains the chart.
+# -----------------------------------------------------------
+maintainers:
+  - name: Tariq Mahmood
+    email: tariq@example.com
+
+
+# -----------------------------------------------------------
+# SOURCE CODE REPOSITORY
+# Optional field referencing project source.
+# -----------------------------------------------------------
+sources:
+  - https://github.com/tariqsulehri/aws-devops
+
+
+# -----------------------------------------------------------
+# KEYWORDS
+# Useful for Helm repositories and chart discovery.
+# -----------------------------------------------------------
+keywords:
+  - nodejs
+  - kubernetes
+  - helm
+  - webapp
+
+
+# -----------------------------------------------------------
+# HOME PAGE
+# URL for project documentation.
+# -----------------------------------------------------------
+home: https://github.com/tariqsulehri/aws-devops

@@ -1,0 +1,43 @@
+# -----------------------------------------------------------
+# API VERSION
+# Specifies Kubernetes API group for Service resources
+# -----------------------------------------------------------
+apiVersion: v1
+
+
+# -----------------------------------------------------------
+# RESOURCE TYPE
+# Defines this object as a Service resource
+# -----------------------------------------------------------
+kind: Service
+
+
+# -----------------------------------------------------------
+# METADATA
+# Used for identifying and organizing Kubernetes resources
+# -----------------------------------------------------------
+metadata:
+  name: nodapp-service
+  labels:
+    app: nodapp
+
+
+# -----------------------------------------------------------
+# SERVICE SPECIFICATION
+# Defines how traffic is routed to Pods
+# -----------------------------------------------------------
+spec:
+
+  # Service exposure type
+  type: {{ .Values.service.type }}
+
+  # Pods targeted by this service
+  selector:
+    app: nodapp
+
+  # Port mapping configuration
+  ports:
+
+  - port: {{ .Values.service.port }}
+    targetPort: {{ .Values.service.targetPort }}
+    protocol: TCP

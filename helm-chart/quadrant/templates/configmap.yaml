@@ -1,0 +1,51 @@
+# -----------------------------------------------------------
+# CONFIGMAP TEMPLATE
+# This ConfigMap stores non-sensitive configuration values
+# that will be injected into the application container as
+# environment variables.
+#
+# Values are dynamically loaded from Helm values.yaml.
+# -----------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  # ---------------------------------------------------------
+  # NAME OF CONFIGMAP
+  # The name is referenced later in the Deployment when
+  # injecting environment variables into the container.
+  # ---------------------------------------------------------
+  name: {{ .Values.configmap.name }}
+
+
+data:
+
+  # ---------------------------------------------------------
+  # APPLICATION ENVIRONMENT MODE
+  # Example values:
+  # production, staging, development
+  # ---------------------------------------------------------
+  APP_ENV: {{ .Values.config.APP_ENV | quote }}
+
+
+  # ---------------------------------------------------------
+  # APPLICATION DISPLAY NAME
+  # Used for logging, monitoring, and UI display
+  # ---------------------------------------------------------
+  APP_NAME: {{ .Values.config.APP_NAME | quote }}
+
+
+  # ---------------------------------------------------------
+  # APPLICATION PORT
+  # Port where the application listens inside the container
+  # Must match containerPort defined in deployment.yaml
+  # ---------------------------------------------------------
+  APP_PORT: {{ .Values.config.APP_PORT | quote }}
+
+
+  # ---------------------------------------------------------
+  # FEATURE FLAGS
+  # Feature toggles allow enabling/disabling functionality
+  # without modifying application code.
+  # ---------------------------------------------------------
+  FEATURE_LOGIN: {{ .Values.config.FEATURE_LOGIN | quote }}

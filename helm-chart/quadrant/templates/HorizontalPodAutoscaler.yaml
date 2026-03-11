@@ -1,0 +1,112 @@
+# -----------------------------------------------------------
+# CONDITIONAL RESOURCE CREATION
+# This HPA resource will only be created if autoscaling
+# is enabled in values.yaml.
+# -----------------------------------------------------------
+{{- if .Values.autoscaling.enabled }}
+
+
+# -----------------------------------------------------------
+# API VERSION DECLARATION
+# Specifies which Kubernetes Autoscaling API manages
+# HorizontalPodAutoscaler resources.
+# autoscaling/v2 supports advanced metrics.
+# -----------------------------------------------------------
+apiVersion: autoscaling/v2 # Kubernetes Autoscaling API version
+
+
+# -----------------------------------------------------------
+# RESOURCE TYPE IDENTIFICATION
+# Defines this object as a Horizontal Pod Autoscaler.
+# HPA automatically adjusts the number of Pods based
+# on resource usage metrics.
+# -----------------------------------------------------------
+kind: HorizontalPodAutoscaler # Declares this resource as an HPA
+
+
+# -----------------------------------------------------------
+# METADATA SECTION
+# Used for identification and management of the autoscaler.
+# -----------------------------------------------------------
+metadata: # Object metadata container
+  name: nodapp-hpa # Unique identifier for this HPA resource
+
+
+# -----------------------------------------------------------
+# AUTOSCALER SPECIFICATION
+# Defines the scaling behavior and rules.
+# -----------------------------------------------------------
+spec:
+
+
+  # ---------------------------------------------------------
+  # TARGET WORKLOAD REFERENCE
+  # Identifies the workload whose Pods will be scaled.
+  # ---------------------------------------------------------
+  scaleTargetRef: # Reference to the workload controlled by HPA
+    apiVersion: apps/v1 # API version of the target resource
+    kind: Deployment # Target workload type
+    name: nodapp-deployment # Name of the Deployment being scaled
+
+
+  # ---------------------------------------------------------
+  # MINIMUM REPLICA COUNT
+  # Defines the lowest number of Pods that must always exist.
+  # Prevents application downtime during low traffic.
+  # ---------------------------------------------------------
+  minReplicas: {{ .Values.autoscaling.minReplicas }} # Minimum replicas from values.yaml
+
+
+  # ---------------------------------------------------------
+  # MAXIMUM REPLICA COUNT
+  # Defines the maximum number of Pods allowed during scaling.
+  # Prevents uncontrolled resource consumption.
+  # ---------------------------------------------------------
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }} # Maximum replicas from values.yaml
+
+
+  # ---------------------------------------------------------
+  # SCALING METRICS
+  # Defines which resource metrics trigger scaling actions.
+  # ---------------------------------------------------------
+  metrics: # List of metrics used for scaling decisions
+
+
+  # ---------------------------------------------------------
+  # RESOURCE UTILIZATION METRIC (CPU)
+  # ---------------------------------------------------------
+  - type: Resource # Indicates the metric type is a Kubernetes resource
+
+
+    resource: # Resource metric configuration
+
+
+      # -----------------------------------------------------
+      # RESOURCE NAME
+      # CPU utilization is monitored for scaling decisions.
+      # -----------------------------------------------------
+      name: cpu # Specifies CPU as the scaling metric
+
+
+      target: # Target threshold configuration
+
+
+        # ---------------------------------------------------
+        # TARGET TYPE
+        # Utilization measures percentage of requested CPU used.
+        # ---------------------------------------------------
+        type: Utilization # Scaling based on CPU utilization percentage
+
+
+        # ---------------------------------------------------
+        # SCALING THRESHOLD
+        # When average CPU usage across Pods exceeds this
+        # percentage, Kubernetes increases replica count.
+        # ---------------------------------------------------
+        averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }} # CPU threshold from values.yaml
+
+
+# -----------------------------------------------------------
+# END CONDITIONAL BLOCK
+# -----------------------------------------------------------
+{{- end }}

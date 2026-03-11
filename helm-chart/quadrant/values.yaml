@@ -1,0 +1,139 @@
+# -----------------------------------------------------------
+# WORKLOAD REPLICATION STRATEGY
+# Controls how many application Pods should run by default.
+# If HPA is enabled, this value acts as the starting replica count.
+# -----------------------------------------------------------
+replicaCount: 2  # Default number of Pod replicas created by the Deployment
+
+
+# -----------------------------------------------------------
+# CONTAINER IMAGE CONFIGURATION
+# Defines the Docker image that Kubernetes will run inside Pods.
+# -----------------------------------------------------------
+image: # Image configuration block
+  repository: tariqsulehri/nodapp-k8s # Docker repository containing the application image
+  tag: "latest" # Image version tag used during deployment
+  pullPolicy: IfNotPresent # Kubernetes pulls image only if not already present on the node
+
+
+# -----------------------------------------------------------
+# SERVICE EXPOSURE CONFIGURATION
+# Defines how the application is exposed inside the cluster.
+# Kubernetes Service provides stable networking for Pods.
+# -----------------------------------------------------------
+service: # Service configuration block
+  type: ClusterIP # Service type; ClusterIP exposes service only inside cluster
+  port: 3500 # Port exposed by the Kubernetes Service
+  targetPort: 3500 # Actual container port where the application listens
+
+
+# -----------------------------------------------------------
+# INGRESS CONTROLLER SETTINGS
+# Defines external HTTP routing rules to reach the application.
+# -----------------------------------------------------------
+ingress: # Ingress configuration block
+  enabled: true # Enables or disables creation of the Ingress resource
+  className: nginx # Specifies which Ingress controller should handle this resource
+
+  hosts: # List of domains mapped to the application
+    - host: nodapp.local # Domain name used to access the application
+      paths: # URL path rules for routing traffic
+        - path: / # Root URL path for the application
+          pathType: Prefix # Matches any URL starting with "/"
+
+  tls: [] # TLS configuration list (empty means HTTPS not configured)
+
+
+# -----------------------------------------------------------
+# GLOBAL ENVIRONMENT VARIABLES
+# These variables are injected directly into the container.
+# -----------------------------------------------------------
+env: # Environment variable block
+  NODE_ENV: production # Sets Node.js runtime mode (production, development, etc.)
+
+
+# -----------------------------------------------------------
+# CONFIGMAP IDENTIFICATION
+# Name of the ConfigMap created by Helm and referenced by Deployment.
+# -----------------------------------------------------------
+configmap: # ConfigMap configuration block
+  name: app-config # Name assigned to the ConfigMap resource
+
+
+# -----------------------------------------------------------
+# APPLICATION CONFIGURATION DATA
+# Stored in ConfigMap and injected into container as environment variables.
+# -----------------------------------------------------------
+config: # Key-value pairs stored in the ConfigMap
+  APP_ENV: "production" # Environment identifier used by the application
+  APP_NAME: "Node Kubernetes App" # Human-readable application name
+  APP_PORT: "3500" # Port where the application listens inside container
+  FEATURE_LOGIN: "enabled" # Feature flag controlling login functionality
+
+
+# -----------------------------------------------------------
+# RESOURCE MANAGEMENT SETTINGS
+# Defines CPU and memory allocation for each Pod.
+# -----------------------------------------------------------
+resources: # Resource configuration block
+
+  requests: # Minimum resources guaranteed to the container
+    cpu: "100m" # Requests 0.1 CPU core from the scheduler
+    memory: "128Mi" # Requests 128MB memory allocation
+
+  limits: # Maximum resources container is allowed to consume
+    cpu: "500m" # Limits CPU usage to half a CPU core
+    memory: "256Mi" # Limits memory usage to 256MB
+
+
+# -----------------------------------------------------------
+# APPLICATION READINESS PROBE
+# Determines when the Pod is ready to receive traffic.
+# -----------------------------------------------------------
+readinessProbe: # Readiness health check configuration
+  path: / # Endpoint used for readiness verification
+  port: 3500 # Port used to perform readiness check
+  initialDelaySeconds: 5 # Delay before first readiness probe runs
+  periodSeconds: 10 # Time interval between readiness checks
+
+
+# -----------------------------------------------------------
+# APPLICATION LIVENESS PROBE
+# Detects application crashes and restarts the container if needed.
+# -----------------------------------------------------------
+livenessProbe: # Liveness health check configuration
+  path: / # Endpoint used to verify application health
+  port: 3500 # Port used for liveness probe
+  initialDelaySeconds: 15 # Startup delay before liveness checks begin
+  periodSeconds: 20 # Interval between health checks
+
+
+# -----------------------------------------------------------
+# HORIZONTAL POD AUTOSCALING SETTINGS
+# Controls automatic scaling based on CPU usage.
+# -----------------------------------------------------------
+autoscaling: # HPA configuration block
+  enabled: true # Enables Horizontal Pod Autoscaler creation
+  minReplicas: 2 # Minimum number of Pods allowed
+  maxReplicas: 6 # Maximum number of Pods allowed during scaling
+  targetCPUUtilizationPercentage: 75 # CPU threshold that triggers scaling
+
+
+# -----------------------------------------------------------
+# SERVICE ACCOUNT CONFIGURATION
+# Defines Kubernetes identity used by Pods for RBAC permissions.
+# -----------------------------------------------------------
+serviceAccount: # ServiceAccount configuration block
+  create: true # Helm should create the ServiceAccount resource
+  name: nodapp-sa # Name assigned to the ServiceAccount
+
+
+# -----------------------------------------------------------
+# ADVANCED POD SCHEDULING SETTINGS
+# Controls where Pods can be scheduled within the cluster.
+# -----------------------------------------------------------
+nodeSelector: {} # Node label selectors restricting which nodes run Pods
+
+tolerations: [] # Allows Pods to run on nodes with matching taints
+
+affinity: {} # Defines advanced scheduling rules (e.g., anti-affinity for HA)

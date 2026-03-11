@@ -1,0 +1,154 @@
+# -----------------------------------------------------------
+# API VERSION DECLARATION
+# Specifies the Kubernetes API group responsible for managing
+# Deployment resources. apps/v1 is the stable API used in
+# modern Kubernetes clusters.
+# -----------------------------------------------------------
+apiVersion: apps/v1 # Kubernetes Deployment API version
+
+
+# -----------------------------------------------------------
+# RESOURCE TYPE IDENTIFICATION
+# Indicates that this YAML defines a Deployment resource,
+# which manages Pods, scaling, and rolling updates.
+# -----------------------------------------------------------
+kind: Deployment # Declares this resource as a Deployment
+
+
+# -----------------------------------------------------------
+# METADATA SECTION
+# Metadata is used by Kubernetes for identifying and
+# organizing resources inside the cluster.
+# -----------------------------------------------------------
+metadata: # Object-level metadata container
+  name: nodapp-deployment # Unique identifier name for the Deployment resource
+  labels: # Key-value labels used to organize and group Kubernetes objects
+    app: nodapp # Label identifying this Deployment as part of the "nodapp" application
+
+
+# -----------------------------------------------------------
+# DEPLOYMENT SPECIFICATION
+# Defines the desired operational state of the application.
+# Kubernetes continuously works to ensure this state is met.
+# -----------------------------------------------------------
+spec: # Specification block describing desired Deployment behavior
+
+  # ---------------------------------------------------------
+  # REPLICA COUNT
+  # Number of Pod instances the Deployment should maintain.
+  # Value dynamically pulled from Helm values.yaml
+  # ---------------------------------------------------------
+  replicas: {{ .Values.replicaCount }} # Helm variable controlling number of Pods
+
+
+  # ---------------------------------------------------------
+  # POD SELECTION CRITERIA
+  # Defines which Pods belong to this Deployment.
+  # Must match labels defined in the Pod template.
+  # ---------------------------------------------------------
+  selector: # Selection rule determining which Pods this Deployment manages
+    matchLabels: # Exact label matching rule
+      app: nodapp # Pods with this label are managed by this Deployment
+
+
+  # ---------------------------------------------------------
+  # POD TEMPLATE DEFINITION
+  # Blueprint used by Kubernetes whenever a new Pod is created.
+  # ---------------------------------------------------------
+  template: # Template describing how Pods should be created
+
+    metadata: # Metadata applied to each Pod created by this Deployment
+      labels: # Labels assigned to Pods for identification and service targeting
+        app: nodapp # Enables Service and HPA to locate and manage these Pods
+
+
+    spec: # Specification describing Pod configuration
+
+      # -----------------------------------------------------
+      # SERVICE ACCOUNT ASSIGNMENT
+      # Defines which Kubernetes identity the Pod will use
+      # when interacting with the Kubernetes API.
+      # -----------------------------------------------------
+      serviceAccountName: {{ .Values.serviceAccount.name }} # ServiceAccount defined in values.yaml
+
+
+      # -----------------------------------------------------
+      # CONTAINER DEFINITIONS
+      # List of containers running inside this Pod.
+      # -----------------------------------------------------
+      containers: # Container configuration list
+
+      - name: nodapp-container # Logical identifier for the container inside the Pod
+
+
+        # ---------------------------------------------------
+        # CONTAINER IMAGE CONFIGURATION
+        # Defines which Docker image will run the application.
+        # Image name and version are controlled via values.yaml.
+        # ---------------------------------------------------
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}" # Docker image repository and version
+        imagePullPolicy: {{ .Values.image.pullPolicy }} # Determines when Kubernetes pulls the image
+
+
+        # ---------------------------------------------------
+        # CONTAINER PORT CONFIGURATION
+        # Defines the port exposed by the application inside
+        # the container runtime environment.
+        # ---------------------------------------------------
+        ports: # Network port definitions for the container
+        - containerPort: {{ .Values.service.targetPort }} # Port where application listens
+
+
+        # ---------------------------------------------------
+        # STATIC ENVIRONMENT VARIABLES
+        # Defines fixed environment variables used by the
+        # application process.
+        # ---------------------------------------------------
+        env: # Environment variable list
+        - name: NODE_ENV # Name of the environment variable
+          value: {{ .Values.env.NODE_ENV | quote }} # Value injected from values.yaml
+
+
+        # ---------------------------------------------------
+        # CONFIGMAP ENVIRONMENT INJECTION
+        # Loads multiple environment variables from the
+        # ConfigMap defined in templates/configmap.yaml
+        # ---------------------------------------------------
+        envFrom: # Bulk environment variable import section
+        - configMapRef: # Reference to external ConfigMap
+            name: {{ .Values.configmap.name }} # ConfigMap name defined in values.yaml
+
+
+        # ---------------------------------------------------
+        # RESOURCE MANAGEMENT SETTINGS
+        # Controls CPU and memory allocation for the container.
+        # Helps Kubernetes scheduler place Pods efficiently.
+        # ---------------------------------------------------
+        resources: # Resource specification block
+{{ toYaml .Values.resources | indent 10 }} # Injects resource configuration from values.yaml
+
+
+        # ---------------------------------------------------
+        # READINESS PROBE
+        # Determines when the container is ready to receive
+        # traffic from Services and Ingress.
+        # ---------------------------------------------------
+        readinessProbe: # Readiness health-check definition
+          httpGet: # Performs HTTP GET request to check status
+            path: {{ .Values.readinessProbe.path }} # Endpoint path used for readiness verification
+            port: {{ .Values.readinessProbe.port }} # Port used for readiness probe
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }} # Wait time before first check
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }} # Interval between readiness checks
+
+
+        # ---------------------------------------------------
+        # LIVENESS PROBE
+        # Determines if the application container should be
+        # restarted when it becomes unhealthy.
+        # ---------------------------------------------------
+        livenessProbe: # Liveness health-check definition
+          httpGet: # Performs HTTP GET request for health check
+            path: {{ .Values.livenessProbe.path }} # Endpoint path used for liveness verification
+            port: {{ .Values.livenessProbe.port }} # Port used for liveness probe
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }} # Delay before starting checks
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }} # Frequency of liveness checks
