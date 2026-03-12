@@ -1,0 +1,88 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: qdrant-backup
+  namespace: qdrant
+spec:
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 1800
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: OnFailure
+          terminationGracePeriodSeconds: 30
+          initContainers:
+          - name: create-snapshots
+            image: curlimages/curl:8.12.1
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/sh
+            - /scripts/backup.sh
+            - snapshot
+            env:
+            - name: QDRANT_URL
+              value: "http://qdrant.qdrant.svc.cluster.local:6333"
+            - name: WORKDIR
+              value: /workdir
+            - name: BACKUP_PREFIX
+              value: snapshots
+            envFrom:
+            - secretRef:
+                name: qdrant-secrets
+                optional: true
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi
+            volumeMounts:
+            - name: backup-script
+              mountPath: /scripts
+              readOnly: true
+            - name: snapshot-workdir
+              mountPath: /workdir
+          containers:
+          - name: upload-snapshots
+            image: amazon/aws-cli:2.15.0
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/sh
+            - /scripts/backup.sh
+            - upload
+            env:
+            - name: WORKDIR
+              value: /workdir
+            - name: BACKUP_PREFIX
+              value: snapshots
+            - name: BACKUP_RETENTION_COUNT
+              value: "20"
+            envFrom:
+            - secretRef:
+                name: qdrant-backup-secrets
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi
+            volumeMounts:
+            - name: backup-script
+              mountPath: /scripts
+              readOnly: true
+            - name: snapshot-workdir
+              mountPath: /workdir
+          volumes:
+          - name: backup-script
+            configMap:
+              name: qdrant-backup-script
+          - name: snapshot-workdir
+            emptyDir: {}

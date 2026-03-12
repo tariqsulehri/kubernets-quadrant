@@ -1,0 +1,399 @@
+# Identify this document as the production Helm values file for Qdrant.
+###############################################################
+# State that the file is intended for a production-style Kubernetes deployment.
+# QDRANT HELM VALUES FILE
+# Summarize the deployment profile represented by this values file.
+# Production configuration for Kubernetes deployment
+# Preserve spacing so the header block stays readable.
+#
+# Introduce the capability summary that follows.
+# This configuration enables:
+# Record that the cluster is sized for quorum-based availability.
+# - High availability (3 replicas)
+# Record that vector data is persisted outside the container filesystem.
+# - Persistent storage
+# Record that snapshots are stored on dedicated persistent storage.
+# - Snapshot backup storage
+# Record that the service is exposed through Kubernetes ingress.
+# - Ingress access
+# Record that health probes are enabled for lifecycle management.
+# - Health checks
+# Record that disruptions are limited to protect cluster stability.
+# - Pod disruption protection
+# Record that CPU and memory boundaries are explicitly defined.
+# - Resource limits
+# Close the header banner cleanly.
+###############################################################
+
+# Run three Qdrant pods so the cluster can maintain quorum during a single-node failure.
+replicaCount: 3
+
+# Group all container image settings under a single section.
+image:
+  # Pull the upstream Qdrant image from Docker Hub.
+  repository: docker.io/qdrant/qdrant
+  # Reuse local images when possible to reduce unnecessary pulls.
+  pullPolicy: IfNotPresent
+  # Defer the exact image tag to the Helm chart default unless overridden later.
+  tag: ''
+  # Keep the standard image variant because this deployment already controls security through pod settings.
+  useUnprivilegedImage: false
+
+# Do not require any private registry secrets for the current image source.
+imagePullSecrets: []
+
+# Keep the Helm release name unchanged unless an environment-specific override is needed.
+nameOverride: ''
+# Keep the fully qualified resource names derived from the Helm release by default.
+fullnameOverride: ''
+
+# Define the startup command list for the Qdrant container.
+args:
+# Start through the chart's initialization script so storage and config bootstrap happen consistently.
+- ./config/initialize.sh
+
+# Leave custom environment variables empty until a platform-specific requirement appears.
+env: []
+# Preserve an example entry to show the expected schema for future overrides.
+# Example:
+# Show that each environment variable is expressed as a `name` and `value` pair.
+# - name: QDRANT_ALLOW_RECOVERY_MODE
+# Demonstrate the value field used by Helm for env injection.
+#   value: true
+
+# Group Kubernetes Service settings for internal cluster networking.
+service:
+  # Expose Qdrant internally with a stable cluster-internal virtual IP.
+  type: ClusterIP
+  # Reserve a place for platform-specific service labels without imposing defaults.
+  additionalLabels: {}
+  # Reserve a place for service annotations such as cloud load balancer hints if the service type changes later.
+  annotations: {}
+  # Leave the load balancer IP empty because this service is not configured as a LoadBalancer.
+  loadBalancerIP: ''
+
+  # Define the ports published by the Kubernetes Service.
+  ports:
+  # Expose the REST API that most clients and the ingress will target.
+  - name: http
+    # Publish the standard Qdrant HTTP port.
+    port: 6333
+    # Route traffic to the same port on the container.
+    targetPort: 6333
+    # Use TCP because Qdrant HTTP traffic is served over TCP.
+    protocol: TCP
+    # Allow service health checks on the HTTP endpoint.
+    checksEnabled: true
+
+  # Expose the gRPC API for high-performance or strongly typed clients.
+  - name: grpc
+    # Publish the standard Qdrant gRPC port.
+    port: 6334
+    # Route traffic to the matching container port.
+    targetPort: 6334
+    # Use TCP because gRPC runs over HTTP/2 on TCP.
+    protocol: TCP
+    # Skip chart-level checks on gRPC because the HTTP endpoint is the primary health surface.
+    checksEnabled: false
+
+  # Expose the peer-to-peer port used for cluster replication and consensus traffic.
+  - name: p2p
+    # Publish the standard internal cluster port.
+    port: 6335
+    # Route that peer traffic to the same container port.
+    targetPort: 6335
+    # Use TCP for node-to-node cluster communication.
+    protocol: TCP
+    # Skip service checks because this port is for internal cluster coordination, not client health validation.
+    checksEnabled: false
+
+# Group ingress settings for external HTTP access.
+ingress:
+  # Enable ingress so clients can reach Qdrant through the cluster ingress controller.
+  enabled: true
+  # Target the NGINX ingress class that is expected to exist in this cluster.
+  ingressClassName: nginx
+  # Leave room for extra ingress labels that may be required by platform policy.
+  additionalLabels: {}
+  # Leave ingress annotations empty until rewrite, auth, or TLS controller hints are needed.
+  annotations: {}
+
+  # Define the host rules served by the ingress resource.
+  hosts:
+  # Bind the ingress to the internal DNS name chosen for Qdrant.
+  - host: qdrant.tkxel.local
+    # Define the path mappings under that host.
+    paths:
+    # Route all URL paths to the Qdrant HTTP service.
+    - path: /
+      # Use prefix matching so every API route is forwarded.
+      pathType: Prefix
+      # Send ingress traffic to the HTTP service port rather than gRPC or p2p.
+      servicePort: 6333
+  # Leave TLS disabled here until certificates and a secret are provisioned.
+  tls: []
+
+# Configure the liveness probe that determines when Kubernetes should restart a stuck container.
+livenessProbe:
+  # Enable liveness checks in production so failed processes are recycled automatically.
+  enabled: true
+  # Wait long enough for Qdrant to initialize before the first liveness check.
+  initialDelaySeconds: 30
+  # Probe every ten seconds to balance responsiveness and overhead.
+  periodSeconds: 10
+  # Fail the check quickly if the container stops responding.
+  timeoutSeconds: 2
+  # Tolerate several consecutive failures before forcing a restart.
+  failureThreshold: 6
+  # Require only one successful probe to declare the container alive again.
+  successThreshold: 1
+
+# Configure the readiness probe that controls whether the pod receives service traffic.
+readinessProbe:
+  # Enable readiness checks so traffic is withheld until the node can actually serve requests.
+  enabled: true
+  # Start readiness checks slightly earlier than liveness checks to admit traffic as soon as possible.
+  initialDelaySeconds: 20
+  # Check readiness frequently so rolling updates converge quickly.
+  periodSeconds: 5
+  # Use a short timeout to surface unhealthy states promptly.
+  timeoutSeconds: 2
+  # Require repeated failures before marking the pod unready to avoid flapping.
+  failureThreshold: 6
+  # Accept a single passing result to return the pod to service.
+  successThreshold: 1
+
+# Configure the optional startup probe for very slow boot scenarios.
+startupProbe:
+  # Leave the startup probe disabled because the current initialization profile is already covered by liveness timing.
+  enabled: false
+  # Keep the timing values ready in case startup probes are enabled later.
+  initialDelaySeconds: 10
+  # Check startup status every five seconds if the probe is turned on.
+  periodSeconds: 5
+  # Fail fast on each startup probe attempt.
+  timeoutSeconds: 1
+  # Permit an extended startup window before Kubernetes gives up.
+  failureThreshold: 30
+  # Require only one passing check to complete startup.
+  successThreshold: 1
+
+# Leave workload-level labels empty until governance or observability policies require them.
+additionalLabels: {}
+# Leave workload-level annotations empty until a controller or policy needs them.
+additionalAnnotations: {}
+# Leave pod annotations empty for now to avoid accidental coupling to cluster-specific integrations.
+podAnnotations: {}
+# Leave pod labels empty until scheduling, cost, or observability rules need them.
+podLabels: {}
+
+# Define CPU and memory guarantees and ceilings for the Qdrant container.
+resources:
+  # Reserve enough baseline capacity for stable indexing and query workloads.
+  requests:
+    # Guarantee half a CPU core to reduce scheduling contention.
+    cpu: 500m
+    # Guarantee one gibibyte of memory so the pod is not starved under normal load.
+    memory: 1Gi
+  # Cap the container to protect cluster neighbors from runaway usage.
+  limits:
+    # Allow bursts up to two full CPU cores for indexing or compaction work.
+    cpu: 2
+    # Cap memory at four gibibytes to keep node pressure predictable.
+    memory: 4Gi
+
+# Define container-level hardening controls.
+containerSecurityContext:
+  # Enforce non-root execution inside the container.
+  runAsNonRoot: true
+  # Use a fixed application UID to keep filesystem ownership predictable.
+  runAsUser: 1000
+  # Use a fixed primary GID for process execution.
+  runAsGroup: 2000
+  # Prevent the process from acquiring extra privileges.
+  allowPrivilegeEscalation: false
+  # Explicitly forbid privileged container mode.
+  privileged: false
+  # Make the root filesystem read-only to reduce mutation and persistence risk.
+  readOnlyRootFilesystem: true
+
+# Define pod-level filesystem and security settings shared by all containers.
+podSecurityContext:
+  # Set a filesystem group so mounted volumes are writable by the application where required.
+  fsGroup: 3000
+  # Reconcile volume ownership on every mount to avoid stale permissions across reschedules.
+  fsGroupChangePolicy: Always
+
+# Define lifecycle hooks that run during pod termination.
+lifecycle:
+  # Configure behavior that should happen before the container stops.
+  preStop:
+    # Execute a simple command in the container before shutdown.
+    exec:
+      # Define the command array for the preStop hook.
+      command:
+      # Sleep briefly to give Kubernetes time to remove the pod from endpoints before termination.
+      - sleep
+      # Wait five seconds before allowing the process to exit.
+      - '5'
+
+# Fix persistent volume ownership automatically so the process can use attached storage.
+updateVolumeFsOwnership: true
+
+# Leave node selection open so the scheduler can choose any compatible worker by default.
+nodeSelector: {}
+
+# Do not tolerate taints by default; this keeps the workload on standard schedulable nodes unless explicitly allowed.
+tolerations: []
+
+# Define affinity rules that influence pod placement.
+affinity:
+  # Prefer separating replicas across nodes to reduce correlated failure risk.
+  podAntiAffinity:
+    # Use a soft preference rather than a hard requirement to avoid blocking scheduling in small clusters.
+    preferredDuringSchedulingIgnoredDuringExecution:
+    # Apply the strongest anti-affinity weight supported by this preference list.
+    - weight: 100
+      # Describe which existing pods this replica should avoid co-locating with.
+      podAffinityTerm:
+        # Spread replicas across unique Kubernetes nodes.
+        topologyKey: kubernetes.io/hostname
+
+# Spread replicas evenly across nodes when the scheduler has placement choices.
+topologySpreadConstraints:
+- maxSkew: 1
+  topologyKey: kubernetes.io/hostname
+  whenUnsatisfiable: ScheduleAnyway
+
+# Define the primary persistent volume claim for live vector data.
+persistence:
+  enabled: true
+  accessModes:
+  - ReadWriteOnce
+  # Enable persistent storage so data survives pod restarts and rescheduling.
+  storageClassName: standard
+  size: 10Gi
+  # Declare the access mode list for the PVC.
+
+  # Leave PVC annotations empty until a storage class integration needs them.
+  annotations: {}
+  # Leave PVC labels empty unless storage governance requires classification.
+  additionalLabels:
+    app.kubernetes.io/component: vector-db
+# Define a separate persistent volume claim for snapshots and backups.
+snapshotPersistence:
+  # Enable dedicated snapshot storage so backups do not compete with hot data for space.
+  enabled: true
+  storageClassName: cold-storage
+  # Declare the snapshot PVC access mode list.
+  accessModes:
+  # Use single-node read-write access for snapshot storage as well.
+  - ReadWriteOnce
+  # Allocate twenty gibibytes for local snapshots.
+  size: 20Gi
+  # Leave snapshot PVC annotations empty unless the storage platform requires them.
+  annotations: {}
+  # Leave snapshot PVC labels empty until they are needed for inventory or policy.
+  additionalLabels: {}
+
+# Configure optional bootstrap behavior for restoring data from existing snapshots.
+snapshotRestoration:
+  # Keep restoration disabled during normal operation to avoid accidental recovery workflows on deploy.
+  enabled: false
+  # Reference the PVC name expected to contain restoration artifacts if recovery is enabled.
+  pvcName: snapshots-pvc
+  # Mount restoration snapshots at a dedicated path inside the container.
+  mountPath: /qdrant/snapshot-restoration
+  # Start with no snapshots selected for restoration.
+  snapshots: []
+
+# Define the internal Qdrant application configuration passed through the Helm chart.
+config:
+  # Configure distributed cluster behavior.
+  #service:
+  #api_key: ${QDRANT_API_KEY}
+
+  cluster:
+    # Enable Qdrant clustering so replicas participate in consensus and shard placement.
+    enabled: true
+    # Configure the peer-to-peer channel used by cluster members.
+    p2p:
+      # Bind inter-node communication to the standard Qdrant cluster port.
+      port: 6335
+      # Leave TLS disabled for intra-cluster traffic until certificate management is in place.
+      enable_tls: false
+    # Configure consensus behavior for the embedded coordination layer.
+    consensus:
+      # Use a short tick period to keep consensus responsive in a low-latency cluster network.
+      tick_period_ms: 100
+
+  # Configure the client-facing Qdrant service layer.
+  service:
+    # Leave TLS disabled at the application layer because ingress or service mesh termination is expected instead.
+    enable_tls: false
+
+# Leave sidecar containers empty unless log shipping, backup agents, or service mesh components are added later.
+sidecarContainers: []
+
+# Configure Prometheus integration settings.
+metrics:
+  # Configure a ServiceMonitor for Prometheus Operator environments.
+  serviceMonitor:
+    # Leave the ServiceMonitor disabled until Prometheus Operator is confirmed in the target cluster.
+    enabled: false
+    # Scrape metrics every thirty seconds if monitoring is enabled.
+    scrapeInterval: 30s
+    # Require each scrape to finish within ten seconds.
+    scrapeTimeout: 10s
+    # Scrape the HTTP port rather than a separate exporter port.
+    targetPort: http
+    # Use the default Qdrant metrics endpoint path.
+    targetPath: /metrics
+
+# Configure the Kubernetes service account used by this workload.
+serviceAccount:
+  # Leave service account annotations empty until IAM or workload identity bindings are required.
+  annotations: {}
+
+# Do not attach a priority class until the platform team defines workload priority tiers.
+priorityClassName: ''
+
+# Keep process namespaces isolated between containers because this workload does not need shared process visibility.
+shareProcessNamespace: false
+
+# Use ordered pod startup and termination to keep cluster formation predictable.
+podManagementPolicy: OrderedReady
+
+# Configure the Pod Disruption Budget that protects cluster availability during maintenance.
+podDisruptionBudget:
+  # Enable the budget so voluntary disruptions cannot take down too many replicas at once.
+  enabled: true
+  # Allow at most one unavailable pod, preserving quorum in a three-node cluster.
+  maxUnavailable: 1
+
+# Leave additional volumes empty until extra config, secrets, or sidecar data paths are required.
+additionalVolumes: []
+
+# Leave additional volume mounts empty until those extra volumes are introduced.
+additionalVolumeMounts: []
+
+# Configure the Helm test job used to verify basic deployment behavior.
+chartTests:
+  # Define the database interaction smoke test container.
+  dbInteraction:
+    # Use a lightweight SUSE base image for the Helm test pod.
+    image: registry.suse.com/bci/bci-base:latest
+    # Constrain test job resources so validation does not contend heavily with the main workload.
+    resources:
+      # Reserve minimal resources needed for the test command to run reliably.
+      requests:
+        # Reserve a small fraction of CPU for the test pod.
+        cpu: 100m
+        # Reserve modest memory for the test pod.
+        memory: 200Mi
+      # Cap test job resource consumption tightly.
+      limits:
+        # Prevent the test pod from consuming more than its reserved CPU budget.
+        cpu: 100m
+        # Prevent the test pod from exceeding a small memory footprint.
+        memory: 200Mi

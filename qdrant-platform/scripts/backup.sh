@@ -1,0 +1,165 @@
+#!/bin/sh
+
+set -eu
+
+MODE=${1:-run}
+WORKDIR=${WORKDIR:-/workdir}
+BACKUP_PREFIX=${BACKUP_PREFIX:-snapshots}
+BACKUP_RETENTION_COUNT=${BACKUP_RETENTION_COUNT:-20}
+
+if [ -n "${QDRANT_URL:-}" ]; then
+  QDRANT_URL=${QDRANT_URL%/}
+fi
+
+log() {
+  printf '%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$*"
+}
+
+require_env() {
+  var_name=$1
+  eval "var_value=\${$var_name:-}"
+
+  if [ -z "$var_value" ]; then
+    printf 'Missing required environment variable: %s\n' "$var_name" >&2
+    exit 1
+  fi
+}
+
+qdrant_curl() {
+  if [ -n "${QDRANT_API_KEY:-}" ]; then
+    curl -fsS -H "api-key: ${QDRANT_API_KEY}" "$@"
+    return
+  fi
+
+  curl -fsS "$@"
+}
+
+list_collections() {
+  qdrant_curl "${QDRANT_URL}/collections" \
+    | tr -d '\n\r' \
+    | sed 's/[[:space:]]//g' \
+    | grep -o '"name":"[^"]*"' \
+    | cut -d'"' -f4 || true
+}
+
+create_and_download_snapshots() {
+  require_env QDRANT_URL
+  mkdir -p "${WORKDIR}"
+
+  collections=$(list_collections)
+  if [ -z "${collections}" ]; then
+    log "No collections found. Skipping snapshot creation."
+    return 0
+  fi
+
+  timestamp=$(date -u '+%Y%m%dT%H%M%SZ')
+
+  for collection in ${collections}; do
+    log "Creating snapshot for collection ${collection}"
+    snapshot_response=$(qdrant_curl -X POST "${QDRANT_URL}/collections/${collection}/snapshots")
+    snapshot_name=$(printf '%s' "${snapshot_response}" \
+      | tr -d '\n\r' \
+      | sed 's/[[:space:]]//g' \
+      | sed -n 's/.*"name":"\([^"]*\)".*/\1/p')
+
+    if [ -z "${snapshot_name}" ]; then
+      printf 'Failed to create snapshot for collection: %s\n' "${collection}" >&2
+      exit 1
+    fi
+
+    collection_dir="${WORKDIR}/${collection}"
+    target_file="${collection_dir}/${timestamp}-${snapshot_name}"
+
+    mkdir -p "${collection_dir}"
+
+    log "Downloading snapshot ${snapshot_name} for collection ${collection}"
+    qdrant_curl -o "${target_file}" \
+      "${QDRANT_URL}/collections/${collection}/snapshots/${snapshot_name}"
+  done
+}
+
+enforce_retention() {
+  collection=$1
+  collection_prefix="${BACKUP_PREFIX}/${collection}/"
+
+  object_keys=$(aws s3api list-objects-v2 \
+    --bucket "${S3_BUCKET}" \
+    --prefix "${collection_prefix}" \
+    --region "${AWS_REGION}" \
+    --output text \
+    --query 'sort_by(Contents,&LastModified)[].Key' 2>/dev/null \
+    | tr '\t' '\n' \
+    | sed '/^None$/d;/^$/d')
+
+  if [ -z "${object_keys}" ]; then
+    return 0
+  fi
+
+  object_count=$(printf '%s\n' "${object_keys}" | wc -l | tr -d ' ')
+  if [ "${object_count}" -le "${BACKUP_RETENTION_COUNT}" ]; then
+    return 0
+  fi
+
+  delete_count=$((object_count - BACKUP_RETENTION_COUNT))
+  log "Deleting ${delete_count} old backup(s) for collection ${collection}"
+
+  printf '%s\n' "${object_keys}" | head -n "${delete_count}" | while IFS= read -r object_key; do
+    [ -n "${object_key}" ] || continue
+    aws s3 rm "s3://${S3_BUCKET}/${object_key}" --region "${AWS_REGION}"
+  done
+}
+
+upload_snapshots() {
+  require_env S3_BUCKET
+  require_env AWS_REGION
+
+  if [ ! -d "${WORKDIR}" ]; then
+    log "Snapshot working directory ${WORKDIR} does not exist. Nothing to upload."
+    return 0
+  fi
+
+  snapshot_files=$(find "${WORKDIR}" -type f 2>/dev/null)
+  if [ -z "${snapshot_files}" ]; then
+    log "No snapshot files found in ${WORKDIR}. Nothing to upload."
+    return 0
+  fi
+
+  processed_collections=""
+
+  for snapshot_file in ${snapshot_files}; do
+    relative_path=${snapshot_file#"${WORKDIR}/"}
+    collection=${relative_path%%/*}
+    object_key="${BACKUP_PREFIX}/${relative_path}"
+
+    log "Uploading ${relative_path} to s3://${S3_BUCKET}/${object_key}"
+    aws s3 cp "${snapshot_file}" "s3://${S3_BUCKET}/${object_key}" --region "${AWS_REGION}"
+
+    case " ${processed_collections} " in
+      *" ${collection} "*) ;;
+      *) processed_collections="${processed_collections} ${collection}" ;;
+    esac
+  done
+
+  for collection in ${processed_collections}; do
+    enforce_retention "${collection}"
+  done
+}
+
+case "${MODE}" in
+  snapshot)
+    create_and_download_snapshots
+    ;;
+  upload)
+    upload_snapshots
+    ;;
+  run)
+    create_and_download_snapshots
+    upload_snapshots
+    ;;
+  *)
+    printf 'Unsupported mode: %s\n' "${MODE}" >&2
+    exit 1
+    ;;
+esac
+
+log "Backup workflow completed."

@@ -1,0 +1,80 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: qdrant-restore
+  namespace: qdrant
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+      - name: download-snapshot
+        image: amazon/aws-cli:2.15.0
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - /scripts/restore.sh
+        - download
+        env:
+        - name: COLLECTION
+          value: my_vectors
+        - name: S3_SNAPSHOT_KEY
+          value: snapshots/my_vectors/replace-me.snapshot
+        - name: WORKDIR
+          value: /restore
+        envFrom:
+        - secretRef:
+            name: qdrant-backup-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        volumeMounts:
+        - name: restore-script
+          mountPath: /scripts
+          readOnly: true
+        - name: restore-workdir
+          mountPath: /restore
+      containers:
+      - name: restore-collection
+        image: curlimages/curl:8.12.1
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - /scripts/restore.sh
+        - restore
+        env:
+        - name: QDRANT_URL
+          value: http://qdrant.qdrant.svc.cluster.local:6333
+        - name: COLLECTION
+          value: my_vectors
+        - name: WORKDIR
+          value: /restore
+        envFrom:
+        - secretRef:
+            name: qdrant-secrets
+            optional: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        volumeMounts:
+        - name: restore-script
+          mountPath: /scripts
+          readOnly: true
+        - name: restore-workdir
+          mountPath: /restore
+      volumes:
+      - name: restore-script
+        configMap:
+          name: qdrant-restore-script
+      - name: restore-workdir
+        emptyDir: {}

@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qdrant-ingress
+  namespace: qdrant
+
+  annotations:
+
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+
+spec:
+
+  ingressClassName: nginx
+
+  tls:
+  - hosts:
+    - qdrant.example.com
+    secretName: qdrant-tls
+
+  rules:
+
+  - host: qdrant.example.com
+
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+
+        backend:
+          service:
+            name: qdrant
+            port:
+              number: 6333

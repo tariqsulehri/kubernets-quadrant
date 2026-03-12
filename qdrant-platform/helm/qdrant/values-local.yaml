@@ -1,0 +1,54 @@
+# Qdrant Helm values for local Minikube or single-node kubeadm environments.
+# This file keeps the production profile intact and applies only the overrides
+# required to run reliably on a local cluster.
+
+# Run a single replica locally to avoid unnecessary quorum and storage pressure.
+replicaCount: 1
+
+# Expose through ingress for parity with the production access pattern.
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+  - host: qdrant.local
+    paths:
+    - path: /
+      pathType: Prefix
+      servicePort: 6333
+  tls: []
+
+# Use lighter resources so the pod can schedule on Minikube defaults.
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1
+    memory: 2Gi
+
+# Keep the data PVC on the cluster's default Minikube storage class.
+persistence:
+  enabled: true
+  storageClassName: standard
+  accessModes:
+  - ReadWriteOnce
+  size: 10Gi
+
+# Keep snapshot storage on the same local storage class.
+snapshotPersistence:
+  enabled: true
+  storageClassName: standard
+  accessModes:
+  - ReadWriteOnce
+  size: 5Gi
+
+# Disable distributed mode locally because Minikube runs on a single node.
+config:
+  cluster:
+    enabled: false
+
+# Remove cluster-level placement protections that do not add value locally.
+podDisruptionBudget:
+  enabled: false
+
+topologySpreadConstraints: []
