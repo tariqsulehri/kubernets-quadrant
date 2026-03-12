@@ -40,5 +40,4 @@ helm upgrade --install "${RELEASE_NAME}" qdrant/qdrant \
 kubectl apply -f "${PLATFORM_ROOT}/kubernetes/security/network-policies.yaml"
 kubectl apply -f "${PLATFORM_ROOT}/kubernetes/backup/backup-script-configmap.yaml"
 kubectl apply -f "${PLATFORM_ROOT}/kubernetes/backup/restore-script-configmap.yaml"
-kubectl apply -f "${PLATFORM_ROOT}/kubernetes/backup/backup-cronjob.yaml"
-kubectl apply -f "${PLATFORM_ROOT}/kubernetes/ingress/qdrant-ingress.yaml"
+bash "${PLATFORM_ROOT}/scripts/render-manifest.sh" backup-cronjob | kubectl apply -f -

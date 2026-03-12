@@ -5,13 +5,17 @@ Recovery uses a one-off Kubernetes `Job` that downloads a chosen snapshot from S
 Preparation:
 
 1. Confirm the target collection name.
-2. Identify the full S3 object key for the snapshot to restore.
-3. Edit `kubernetes/backup/restore-job.yaml` and update `COLLECTION` plus `S3_SNAPSHOT_KEY`.
+2. Identify the snapshot file name to restore under the environment prefix, for example `prod/collections/<collection>/<snapshot-file>.snapshot`.
+3. Render the restore job with the target profile, collection, and snapshot file.
 
 Run the restore:
 
 ```bash
-kubectl apply -f kubernetes/backup/restore-job.yaml
+DEPLOY_PROFILE=prod \
+COLLECTION=tkxel_collection \
+SNAPSHOT_FILE=replace-me.snapshot \
+bash scripts/render-manifest.sh restore-job | kubectl apply -f -
+
 kubectl logs job/qdrant-restore -n qdrant -c download-snapshot
 kubectl logs job/qdrant-restore -n qdrant -c restore-collection
 ```

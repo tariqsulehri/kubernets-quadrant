@@ -4,7 +4,7 @@ set -eu
 
 MODE=${1:-run}
 WORKDIR=${WORKDIR:-/restore}
-BACKUP_PREFIX=${BACKUP_PREFIX:-snapshots}
+BACKUP_PREFIX=${BACKUP_PREFIX:-prod/collections}
 
 if [ -n "${QDRANT_URL:-}" ]; then
   QDRANT_URL=${QDRANT_URL%/}

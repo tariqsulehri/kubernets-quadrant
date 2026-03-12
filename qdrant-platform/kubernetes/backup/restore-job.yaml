@@ -19,11 +19,13 @@ spec:
         - download
         env:
         - name: COLLECTION
-          value: my_vectors
-        - name: S3_SNAPSHOT_KEY
-          value: snapshots/my_vectors/replace-me.snapshot
+          value: __COLLECTION__
+        - name: SNAPSHOT_FILE
+          value: __SNAPSHOT_FILE__
         - name: WORKDIR
           value: /restore
+        - name: BACKUP_PREFIX
+          value: __BACKUP_PREFIX__
         envFrom:
         - secretRef:
             name: qdrant-backup-secrets
@@ -52,9 +54,11 @@ spec:
         - name: QDRANT_URL
           value: http://qdrant.qdrant.svc.cluster.local:6333
         - name: COLLECTION
-          value: my_vectors
+          value: __COLLECTION__
         - name: WORKDIR
           value: /restore
+        - name: BACKUP_PREFIX
+          value: __BACKUP_PREFIX__
         envFrom:
         - secretRef:
             name: qdrant-secrets

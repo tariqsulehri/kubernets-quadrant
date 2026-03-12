@@ -4,7 +4,7 @@ set -eu
 
 MODE=${1:-run}
 WORKDIR=${WORKDIR:-/workdir}
-BACKUP_PREFIX=${BACKUP_PREFIX:-snapshots}
+BACKUP_PREFIX=${BACKUP_PREFIX:-prod/collections}
 BACKUP_RETENTION_COUNT=${BACKUP_RETENTION_COUNT:-20}
 
 if [ -n "${QDRANT_URL:-}" ]; then

@@ -15,6 +15,22 @@ This profile is intended for Minikube and single-node local clusters. It uses:
 - reduced CPU and memory
 - clustering disabled
 
+## Environment Profiles
+
+The repo uses four deployment profiles:
+
+- `local`: Minikube and laptop testing
+- `dev`: low-cost shared development environment
+- `staging`: production-like verification environment
+- `prod`: high-availability production environment
+
+Operational backup prefixes follow the same model:
+
+- `local/collections`
+- `dev/collections`
+- `staging/collections`
+- `prod/collections`
+
 ## Local Access
 
 On macOS with the Minikube Docker driver, ingress is exposed through a localhost tunnel instead of direct access to the Minikube VM IP.
@@ -77,3 +93,5 @@ helm upgrade --install qdrant qdrant/qdrant \
   --create-namespace \
   -f helm/qdrant/values-prod.yaml
 ```
+
+The deploy script also renders the backup CronJob with the correct prefix for the selected profile.

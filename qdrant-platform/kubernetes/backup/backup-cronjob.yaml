@@ -31,7 +31,7 @@ spec:
             - name: WORKDIR
               value: /workdir
             - name: BACKUP_PREFIX
-              value: snapshots
+              value: __BACKUP_PREFIX__
             envFrom:
             - secretRef:
                 name: qdrant-secrets
@@ -61,7 +61,7 @@ spec:
             - name: WORKDIR
               value: /workdir
             - name: BACKUP_PREFIX
-              value: snapshots
+              value: __BACKUP_PREFIX__
             - name: BACKUP_RETENTION_COUNT
               value: "20"
             envFrom:

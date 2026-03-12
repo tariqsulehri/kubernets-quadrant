@@ -115,13 +115,16 @@ ingress:
   ingressClassName: nginx
   # Leave room for extra ingress labels that may be required by platform policy.
   additionalLabels: {}
-  # Leave ingress annotations empty until rewrite, auth, or TLS controller hints are needed.
-  annotations: {}
+  # Apply ingress controller timeouts and request body limits suitable for snapshot-heavy traffic.
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
 
   # Define the host rules served by the ingress resource.
   hosts:
-  # Bind the ingress to the internal DNS name chosen for Qdrant.
-  - host: qdrant.tkxel.local
+  # Bind the ingress to the production DNS name served for clients.
+  - host: qdrant.tkxel.example.com
     # Define the path mappings under that host.
     paths:
     # Route all URL paths to the Qdrant HTTP service.
@@ -130,8 +133,11 @@ ingress:
       pathType: Prefix
       # Send ingress traffic to the HTTP service port rather than gRPC or p2p.
       servicePort: 6333
-  # Leave TLS disabled here until certificates and a secret are provisioned.
-  tls: []
+  # Require TLS at the ingress edge in production.
+  tls:
+  - hosts:
+    - qdrant.tkxel.example.com
+    secretName: qdrant-prod-tls
 
 # Configure the liveness probe that determines when Kubernetes should restart a stuck container.
 livenessProbe:
@@ -178,8 +184,9 @@ startupProbe:
   # Require only one passing check to complete startup.
   successThreshold: 1
 
-# Leave workload-level labels empty until governance or observability policies require them.
-additionalLabels: {}
+# Apply environment labels to all top-level resources for filtering and governance.
+additionalLabels:
+  app.kubernetes.io/environment: prod
 # Leave workload-level annotations empty until a controller or policy needs them.
 additionalAnnotations: {}
 # Leave pod annotations empty for now to avoid accidental coupling to cluster-specific integrations.
@@ -191,16 +198,16 @@ podLabels: {}
 resources:
   # Reserve enough baseline capacity for stable indexing and query workloads.
   requests:
-    # Guarantee half a CPU core to reduce scheduling contention.
-    cpu: 500m
-    # Guarantee one gibibyte of memory so the pod is not starved under normal load.
-    memory: 1Gi
+    # Guarantee one full CPU core to reduce scheduling contention under client load.
+    cpu: 1
+    # Guarantee two gibibytes of memory so the pod is not starved during indexing and compaction.
+    memory: 2Gi
   # Cap the container to protect cluster neighbors from runaway usage.
   limits:
-    # Allow bursts up to two full CPU cores for indexing or compaction work.
-    cpu: 2
-    # Cap memory at four gibibytes to keep node pressure predictable.
-    memory: 4Gi
+    # Allow bursts up to four CPU cores for indexing or compaction work.
+    cpu: 4
+    # Cap memory at eight gibibytes to keep node pressure predictable.
+    memory: 8Gi
 
 # Define container-level hardening controls.
 containerSecurityContext:
@@ -250,29 +257,50 @@ tolerations: []
 affinity:
   # Prefer separating replicas across nodes to reduce correlated failure risk.
   podAntiAffinity:
-    # Use a soft preference rather than a hard requirement to avoid blocking scheduling in small clusters.
+    # Use a soft preference rather than a hard requirement to avoid blocking scheduling during partial node outages.
     preferredDuringSchedulingIgnoredDuringExecution:
     # Apply the strongest anti-affinity weight supported by this preference list.
     - weight: 100
       # Describe which existing pods this replica should avoid co-locating with.
       podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - qdrant
+          - key: app.kubernetes.io/instance
+            operator: In
+            values:
+            - qdrant
         # Spread replicas across unique Kubernetes nodes.
         topologyKey: kubernetes.io/hostname
 
 # Spread replicas evenly across nodes when the scheduler has placement choices.
 topologySpreadConstraints:
 - maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: DoNotSchedule
+  labelSelector:
+    matchLabels:
+      app.kubernetes.io/name: qdrant
+      app.kubernetes.io/instance: qdrant
+- maxSkew: 1
   topologyKey: kubernetes.io/hostname
   whenUnsatisfiable: ScheduleAnyway
+  labelSelector:
+    matchLabels:
+      app.kubernetes.io/name: qdrant
+      app.kubernetes.io/instance: qdrant
 
 # Define the primary persistent volume claim for live vector data.
 persistence:
   enabled: true
   accessModes:
   - ReadWriteOnce
-  # Enable persistent storage so data survives pod restarts and rescheduling.
-  storageClassName: standard
-  size: 10Gi
+  # Use the production high-performance block storage class managed by the platform team.
+  storageClassName: qdrant-fast-ssd
+  size: 200Gi
   # Declare the access mode list for the PVC.
 
   # Leave PVC annotations empty until a storage class integration needs them.
@@ -284,17 +312,19 @@ persistence:
 snapshotPersistence:
   # Enable dedicated snapshot storage so backups do not compete with hot data for space.
   enabled: true
-  storageClassName: cold-storage
+  # Use a dedicated production snapshot storage class managed by the platform team.
+  storageClassName: qdrant-snapshots
   # Declare the snapshot PVC access mode list.
   accessModes:
   # Use single-node read-write access for snapshot storage as well.
   - ReadWriteOnce
-  # Allocate twenty gibibytes for local snapshots.
-  size: 20Gi
+  # Allocate sufficient space for multiple retained snapshots.
+  size: 200Gi
   # Leave snapshot PVC annotations empty unless the storage platform requires them.
   annotations: {}
   # Leave snapshot PVC labels empty until they are needed for inventory or policy.
-  additionalLabels: {}
+  additionalLabels:
+    app.kubernetes.io/environment: prod
 
 # Configure optional bootstrap behavior for restoring data from existing snapshots.
 snapshotRestoration:
@@ -339,8 +369,8 @@ sidecarContainers: []
 metrics:
   # Configure a ServiceMonitor for Prometheus Operator environments.
   serviceMonitor:
-    # Leave the ServiceMonitor disabled until Prometheus Operator is confirmed in the target cluster.
-    enabled: false
+    # Enable scraping in production so alerting and capacity dashboards are available.
+    enabled: true
     # Scrape metrics every thirty seconds if monitoring is enabled.
     scrapeInterval: 30s
     # Require each scrape to finish within ten seconds.
@@ -361,8 +391,8 @@ priorityClassName: ''
 # Keep process namespaces isolated between containers because this workload does not need shared process visibility.
 shareProcessNamespace: false
 
-# Use ordered pod startup and termination to keep cluster formation predictable.
-podManagementPolicy: OrderedReady
+# Use parallel pod management because ordered startup can deadlock multi-node Qdrant clusters.
+podManagementPolicy: Parallel
 
 # Configure the Pod Disruption Budget that protects cluster availability during maintenance.
 podDisruptionBudget:
@@ -370,6 +400,7 @@ podDisruptionBudget:
   enabled: true
   # Allow at most one unavailable pod, preserving quorum in a three-node cluster.
   maxUnavailable: 1
+  unhealthyPodEvictionPolicy: IfHealthyBudget
 
 # Leave additional volumes empty until extra config, secrets, or sidecar data paths are required.
 additionalVolumes: []

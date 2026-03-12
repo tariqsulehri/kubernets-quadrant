@@ -1,0 +1,82 @@
+# Qdrant Helm values for the shared development environment.
+# This profile favors low cost and quick iteration over high availability.
+
+replicaCount: 1
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+  hosts:
+  - host: qdrant-dev.tkxel.local
+    paths:
+    - path: /
+      pathType: Prefix
+      servicePort: 6333
+  tls: []
+
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 6
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 2
+  failureThreshold: 6
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1
+    memory: 2Gi
+
+persistence:
+  enabled: true
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: standard
+  size: 20Gi
+  annotations: {}
+  additionalLabels:
+    app.kubernetes.io/component: vector-db
+    app.kubernetes.io/environment: dev
+
+snapshotPersistence:
+  enabled: true
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: standard
+  size: 10Gi
+  annotations: {}
+  additionalLabels:
+    app.kubernetes.io/environment: dev
+
+config:
+  cluster:
+    enabled: false
+  service:
+    enable_tls: false
+
+metrics:
+  serviceMonitor:
+    enabled: false
+
+podManagementPolicy: Parallel
+
+podDisruptionBudget:
+  enabled: false
+
+topologySpreadConstraints: []
+
+additionalLabels:
+  app.kubernetes.io/environment: dev

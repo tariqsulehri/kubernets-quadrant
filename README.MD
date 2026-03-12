@@ -1,309 +1,113 @@
-# Node Kubernetes Application Deployment
+## Ingress deployment Command
+kubectl apply -f kubernetes/ingress/qdrant-ingress.yaml
 
-This repository contains a **Helm-based Kubernetes deployment** for a Node.js application.
+## Kubernets Create Secrets
 
-The project demonstrates a **production-ready Kubernetes architecture** including:
+kubectl create secret generic s3-credentials \
+--from-literal=AWS_ACCESS_KEY_ID=XXX \
+--from-literal=AWS_SECRET_ACCESS_KEY=YYY
 
-- Deployment
-- Service
-- Ingress
-- ConfigMap
-- Horizontal Pod Autoscaler (HPA)
-- Helm Chart configuration
+## Cleanup Script Exmpale
+aws s3 ls s3://qdrant-backups/ | sort | head -n -7 | awk '{print $4}' | xargs -I {} aws s3 rm s3://qdrant-backups/{}
 
-------------------------------------------------------------
 
-# SEGMENT 1 — PROJECT OVERVIEW
+## Required Environment Variables
 
-This project deploys a **Node.js application** into a Kubernetes cluster using **Helm**.
+# Your CronJob must provide:
+    - QDRANT_URL
+    - S3_BUCKET
+    - AWS_ACCESS_KEY_ID
+    - AWS_SECRET_ACCESS_KEY
+    - AWS_REGION
 
-The deployment supports:
+## DELETE DEPLOYMENT
+helm uninstall qdrant -n qdrant 
+helm list -n qdrant 
 
-- scalable architecture
-- configurable environment variables
-- automatic scaling
-- external access through Ingress
-- infrastructure managed through Helm templates
+Delete Stateful Resources
 
-All configuration is controlled using:
+Qdrant uses PersistentVolumeClaims that remain after uninstall.
 
-values.yaml
+Remove them:
 
-This allows changing deployment behavior without modifying templates.
+kubectl delete pvc -n qdrant --all
 
-------------------------------------------------------------
+Verify:
 
-# SEGMENT 2 — ARCHITECTURE
+kubectl get pvc -n qdrant
 
-Application traffic flows through the following components:
+# Expected:
+No resources found
 
-User Request
-      ↓
-Ingress Controller
-      ↓
-Kubernetes Service
-      ↓
-Deployment
-      ↓
-Pods (Node.js Application)
+# Delete Jobs and CronJobs
+kubectl delete jobs --all -n qdrant
+kubectl delete cronjobs --all -n qdrant
 
-Example flow:
+# Delete ConfigMaps
+kubectl delete configmap --all -n qdrant
 
-Browser → Ingress → Service → Pods
 
-------------------------------------------------------------
+# Delete Old Secrets (Optional)
+# Since we recreated them:
 
-# SEGMENT 3 — PROJECT STRUCTURE
+kubectl delete secret qdrant-backup-secrets -n qdrant
 
-project-root/
+# Verify Namespace Is Clean
+kubectl get all -n qdrant
 
-│
-├── helm-chart/
-│   └── nodapp/
-│       ├── Chart.yaml
-│       ├── values.yaml
-│       └── templates/
-│           ├── deployment.yaml
-│           ├── service.yaml
-│           ├── ingress.yaml
-│           ├── configmap.yaml
-│           └── hpa.yaml
-│
-├── commands.md
-│
-└── README.md
+# Expected:
+No resources found
 
-Explanation:
 
-Chart.yaml  
-Defines chart metadata such as version and name.
+# Configurable Bucket
+kubectl create secret generic qdrant-backup-secrets \
+  -n qdrant \
+  --from-literal=AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+  --from-literal=AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+  --from-literal=AWS_REGION="$AWS_REGION" \
+  --from-literal=S3_BUCKET="$S3_BUCKET" \
+  --dry-run=client -o yaml | kubectl apply -f -
 
-values.yaml  
-Central configuration file for the deployment.
 
-templates/  
-Contains Kubernetes resource templates used by Helm.
+# Fixed Bucket:
+kubectl create secret generic qdrant-backup-secrets \
+  -n qdrant \
+  --from-literal=AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+  --from-literal=AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+  --from-literal=AWS_REGION="$AWS_REGION" \
+  --from-literal=S3_BUCKET="tkxel-qdrant-backups" \
+  --dry-run=client -o yaml | kubectl apply -f -
 
-commands.md  
-Contains operational commands for deployment and troubleshooting.
 
-------------------------------------------------------------
+# upgrade Helm for local Minikube
+helm upgrade --install qdrant qdrant/qdrant \
+  -n qdrant \
+  --create-namespace \
+  -f helm/qdrant/values-local.yaml
 
-# SEGMENT 4 — PREREQUISITES
 
-Before deployment ensure the following tools are installed.
+# access Qdrant locally on Minikube (keep this terminal open)
+minikube service ingress-nginx-controller -n ingress-nginx --url
 
-Required tools:
 
-Kubernetes  
-Helm  
-Docker  
-kubectl
+# example local readiness check from another terminal
+curl -H 'Host: qdrant.local' http://127.0.0.1:<PORT>/readyz
 
-Verify installation:
 
-kubectl version
-helm version
-docker --version
+# browser example
+http://127.0.0.1:<PORT>/dashboard
 
-Verify cluster:
 
-kubectl get nodes
+# optional host mapping for cleaner local URLs
+127.0.0.1 qdrant.local
 
-------------------------------------------------------------
 
-# SEGMENT 5 — HELM CHART CONFIGURATION
+# browser with host mapping
+http://qdrant.local:<PORT>/dashboard
 
-All runtime configuration is defined in:
 
-values.yaml
-
-Examples of configurable parameters:
-
-replica count
-image version
-service port
-ingress domain
-resource limits
-autoscaling configuration
-
-Example values:
-
-replicaCount: 2
-
-image:
-  repository: tariqsulehri/nodapp-k8s
-  tag: latest
-
-service:
-  type: ClusterIP
-  port: 3500
-
-------------------------------------------------------------
-
-# SEGMENT 6 — DEPLOYMENT STEPS
-
-Step 1 — Validate Helm chart
-
-helm lint ./helm-chart/nodapp
-
-Step 2 — Render templates
-
-helm template nodapp ./helm-chart/nodapp
-
-Step 3 — Deploy application
-
-helm install nodapp ./helm-chart/nodapp
-
-Verify deployment:
-
-kubectl get pods
-kubectl get svc
-kubectl get ingress
-kubectl get hpa
-
-------------------------------------------------------------
-
-# SEGMENT 7 — ACCESS APPLICATION
-
-If using local Kubernetes (Minikube):
-
-Add domain mapping:
-
-sudo nano /etc/hosts
-
-Add entry:
-
-127.0.0.1 nodapp.local
-
-Open browser:
-
-http://nodapp.local
-
-------------------------------------------------------------
-
-# SEGMENT 8 — SCALING APPLICATION
-
-Horizontal Pod Autoscaler automatically scales Pods based on CPU usage.
-
-Example configuration:
-
-autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 6
-  targetCPUUtilizationPercentage: 75
-
-Check autoscaler:
-
-kubectl get hpa
-
-------------------------------------------------------------
-
-# SEGMENT 9 — APPLICATION UPDATE
-
-Upgrade deployment after changes:
-
-helm upgrade nodapp ./helm-chart/nodapp
-
-Example updating image:
-
-helm upgrade nodapp ./helm-chart/nodapp \
---set image.tag=v2
-
-------------------------------------------------------------
-
-# SEGMENT 10 — MONITORING
-
-View running Pods:
-
-kubectl get pods
-
-View application logs:
-
-kubectl logs -l app=nodapp
-
-Monitor resources:
-
-kubectl top pods
-
-------------------------------------------------------------
-
-# SEGMENT 11 — TROUBLESHOOTING
-
-Check Pod details:
-
-kubectl describe pod <pod-name>
-
-Check Deployment:
-
-kubectl describe deployment nodapp-deployment
-
-Check autoscaling:
-
-kubectl describe hpa nodapp-hpa
-
-------------------------------------------------------------
-
-# SEGMENT 12 — ROLLBACK DEPLOYMENT
-
-If a deployment fails:
-
-helm history nodapp
-
-Rollback to previous version:
-
-helm rollback nodapp 1
-
-------------------------------------------------------------
-
-# SEGMENT 13 — REMOVE APPLICATION
-
-Remove Helm release:
-
-helm uninstall nodapp
-
-Verify removal:
-
-kubectl get pods
-
-------------------------------------------------------------
-
-# SEGMENT 14 — DEPLOYMENT WORKFLOW
-
-Typical CI/CD workflow:
-
-Developer pushes code
-        ↓
-Docker image built
-        ↓
-Image pushed to registry
-        ↓
-values.yaml updated
-        ↓
-Helm upgrade executed
-        ↓
-Kubernetes performs rolling update
-
-------------------------------------------------------------
-
-# SEGMENT 15 — TECHNOLOGIES USED
-
-Kubernetes  
-Helm  
-Docker  
-Node.js  
-Ingress Controller  
-Horizontal Pod Autoscaler
-
-------------------------------------------------------------
-
-# SEGMENT 16 — QUICK START
-
-Deploy application:
-
-helm install nodapp ./helm-chart/nodapp
-
-Access application:
-
-http://nodapp.local
+# upgrade Helm for production
+helm upgrade --install qdrant qdrant/qdrant \
+  -n qdrant \
+  --create-namespace \
+  -f helm/qdrant/values-prod.yaml

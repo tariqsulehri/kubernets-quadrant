@@ -3,7 +3,14 @@
 The backup workflow runs as a Kubernetes `CronJob` in the `qdrant` namespace every 6 hours. Each run performs two stages:
 
 1. It calls the Qdrant Snapshot API for every collection and downloads the generated snapshot files into a shared temporary volume.
-2. It uploads those files to `s3://tkxel-qdrant-backups/snapshots/<collection>/...` and removes older objects beyond the configured retention count.
+2. It uploads those files into an environment-specific prefix and removes older objects beyond the configured retention count.
+
+Current prefix mapping:
+
+- `local` -> `local/collections/<collection>/...`
+- `dev` -> `dev/collections/<collection>/...`
+- `staging` -> `staging/collections/<collection>/...`
+- `prod` -> `prod/collections/<collection>/...`
 
 Required resources:
 
@@ -37,5 +44,5 @@ Useful verification commands:
 ```bash
 kubectl logs job/manual-backup -n qdrant -c create-snapshots
 kubectl logs job/manual-backup -n qdrant -c upload-snapshots
-aws s3 ls s3://tkxel-qdrant-backups/snapshots/ --recursive
+aws s3 ls s3://tkxel-qdrant-backups/prod/collections/ --recursive
 ```
