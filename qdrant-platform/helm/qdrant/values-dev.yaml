@@ -71,7 +71,7 @@ metrics:
   serviceMonitor:
     enabled: false
 
-podManagementPolicy: Parallel
+podManagementPolicy: OrderedReady
 
 podDisruptionBudget:
   enabled: false

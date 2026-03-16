@@ -111,13 +111,13 @@ config:
 
 metrics:
   serviceMonitor:
-    enabled: true
+    enabled: false
     scrapeInterval: 30s
     scrapeTimeout: 10s
     targetPort: http
     targetPath: /metrics
 
-podManagementPolicy: Parallel
+podManagementPolicy: OrderedReady
 
 podDisruptionBudget:
   enabled: true

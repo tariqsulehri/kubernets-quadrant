@@ -1,5 +1,11 @@
 # Operations
 
+Related documents:
+
+- `docs/setup.md`
+- `docs/environment-strategy.md`
+- `docs/ha-validation.md`
+
 ## Local Minikube Deployment
 
 Deploy the local profile from the `qdrant-platform` directory:

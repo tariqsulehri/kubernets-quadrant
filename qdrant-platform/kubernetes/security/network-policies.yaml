@@ -2,10 +2,53 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: qdrant-default-policy
+  namespace: qdrant
 spec:
   podSelector:
     matchLabels:
-      app: qdrant
+      app.kubernetes.io/name: qdrant
   policyTypes:
-    - Ingress
-    - Egress
+  - Ingress
+  - Egress
+  ingress:
+  # Allow p2p and gRPC traffic between Qdrant pods for Raft consensus
+  # and shard replication. Without this rule, qdrant-2 cannot join the
+  # cluster and crashes with "Failed to add peer" on every startup.
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: qdrant
+    ports:
+    - protocol: TCP
+      port: 6335
+    - protocol: TCP
+      port: 6334
+  # Allow HTTP REST API traffic from anywhere inside the cluster
+  # so services and ingress can reach the Qdrant API on port 6333.
+  - ports:
+    - protocol: TCP
+      port: 6333
+  egress:
+  # Allow Qdrant pods to reach each other for p2p consensus and
+  # gRPC shard replication traffic.
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: qdrant
+    ports:
+    - protocol: TCP
+      port: 6335
+    - protocol: TCP
+      port: 6334
+  # Allow DNS resolution so pods can resolve headless service
+  # hostnames like qdrant-2.qdrant-headless.
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow HTTPS egress to S3 for the backup CronJob to upload
+  # snapshots to the configured S3 bucket.
+  - ports:
+    - protocol: TCP
+      port: 443

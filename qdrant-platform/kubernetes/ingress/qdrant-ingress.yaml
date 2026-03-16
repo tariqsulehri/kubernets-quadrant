@@ -20,12 +20,12 @@ spec:
 
   tls:
   - hosts:
-    - qdrant.example.com
+    - qdrant.prod.com
     secretName: qdrant-tls
 
   rules:
 
-  - host: qdrant.example.com
+  - host: qdrant.prod.com
 
     http:
       paths:

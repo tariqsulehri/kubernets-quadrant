@@ -1,5 +1,11 @@
 # Setup Guide
 
+Related documents:
+
+- `docs/operations.md`
+- `docs/environment-strategy.md`
+- `docs/ha-validation.md`
+
 ## Overview
 
 This guide explains how to set up, configure, deploy, and verify the Qdrant platform from the current branch:

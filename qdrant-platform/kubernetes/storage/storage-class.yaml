@@ -1,6 +1,13 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: qdrant-storage
-provisioner: kubernetes.io/no-provisioner
+  name: qdrant-fast-ssd
+provisioner: k8s.io/minikube-hostpath
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: qdrant-snapshots
+provisioner: k8s.io/minikube-hostpath
 volumeBindingMode: WaitForFirstConsumer

@@ -124,7 +124,7 @@ ingress:
   # Define the host rules served by the ingress resource.
   hosts:
   # Bind the ingress to the production DNS name served for clients.
-  - host: qdrant.tkxel.example.com
+  - host: qdrant.tkxel.prod.com
     # Define the path mappings under that host.
     paths:
     # Route all URL paths to the Qdrant HTTP service.
@@ -136,7 +136,7 @@ ingress:
   # Require TLS at the ingress edge in production.
   tls:
   - hosts:
-    - qdrant.tkxel.example.com
+    - qdrant.tkxel.prod.com
     secretName: qdrant-prod-tls
 
 # Configure the liveness probe that determines when Kubernetes should restart a stuck container.
@@ -370,7 +370,7 @@ metrics:
   # Configure a ServiceMonitor for Prometheus Operator environments.
   serviceMonitor:
     # Enable scraping in production so alerting and capacity dashboards are available.
-    enabled: true
+    enabled: false
     # Scrape metrics every thirty seconds if monitoring is enabled.
     scrapeInterval: 30s
     # Require each scrape to finish within ten seconds.
@@ -392,7 +392,7 @@ priorityClassName: ''
 shareProcessNamespace: false
 
 # Use parallel pod management because ordered startup can deadlock multi-node Qdrant clusters.
-podManagementPolicy: Parallel
+podManagementPolicy: OrderedReady
 
 # Configure the Pod Disruption Budget that protects cluster availability during maintenance.
 podDisruptionBudget:

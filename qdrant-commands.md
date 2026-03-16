@@ -51,5 +51,18 @@ curl -X PUT http://localhost:6333/collections/test_vectors \
   },
   "shard_number": 3,
   "replication_factor": 2
-}' 
+}'
 
+
+## Delete collection
+curl -X DELETE http://127.0.0.1:6333/collections/ha_validation_collection
+
+## Confirm Deletion
+curl -s http://127.0.0.1:6333/collections | python3 -m json.tool
+
+## AFTER RESTORE
+# Check collection exists
+curl -s http://127.0.0.1:6333/collections | python3 -m json.tool
+
+# Check point count
+curl -s http://127.0.0.1:6333/collections/ha_validation_collection | python3 -m json.tool | grep points_count
