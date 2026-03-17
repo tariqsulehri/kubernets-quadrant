@@ -1,3 +1,20 @@
+## Collection was lost after the last redeploy. Recreate it quickly:
+# bash# 1. Create fresh collection with 300 points
+
+python3 tests/load-test.py \
+  --base-url http://127.0.0.1:6333 \
+  --collection tkxel_collection \
+  --points 300 \
+  --batch-size 50 \
+  --search-rounds 25 \
+  --shard-number 3 \
+  --replication-factor 2
+
+# 2. Verify all shards Active and 300 points
+curl -s http://127.0.0.1:6333/collections/tkxel_collection/cluster | python3 -m json.tool
+curl -s http://127.0.0.1:6333/collections/tkxel_collection | python3 -m json.tool | grep points_count
+
+
 
 ## Insert Data 
 curl -X PUT http://localhost:6333/collections/test_vectors \
